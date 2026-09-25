@@ -169,9 +169,9 @@ function ProductOption({ product, checked, onChange }: { product: Product; check
   return (
     <label className={`grid h-full cursor-pointer grid-rows-[auto_1fr] overflow-hidden rounded-2xl border-2 bg-white transition has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${checked ? 'border-beth-green ring-3 ring-beth-green-soft' : 'border-line hover:border-beth-yellow-deep'}`}>
       <input type="radio" name="product" value={product.id} checked={checked} onChange={onChange} className="sr-only" />
-      <span className="photo-placeholder grid aspect-[4/3] place-items-center text-xs tracking-widest text-ink-muted uppercase">
+      <span className="photo-placeholder relative grid aspect-[4/3] place-items-center overflow-hidden text-xs tracking-widest text-ink-muted uppercase">
         {photoOk
-          ? <img src={product.photo} alt={product.name} onError={() => setPhotoOk(false)} className="size-full object-cover" />
+          ? <img src={product.photo} alt={product.name} onError={() => setPhotoOk(false)} className={product.other ? 'absolute inset-0 size-full bg-beth-yellow object-contain p-[18%]' : 'absolute inset-0 size-full object-cover'} />
           : <span className="grid justify-items-center gap-1"><CameraIcon />Photo</span>}
       </span>
       <span className="flex items-start gap-2 px-3 pt-2.5 pb-3 leading-tight font-medium">
