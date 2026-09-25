@@ -4,25 +4,41 @@ import { AGAIN, FACES, PRODUCTS, RATINGS, RESULTS_ROUTE, type Again, type Produc
 import { saveResponse } from './storage'
 import Header, { HeaderLink } from './Header'
 
-type Answers = { productId: string; otherText: string; again: Again | ''; email: string } & Record<RatingKey, number>
-type Field = 'product' | RatingKey | 'again' | 'email'
+type Answers = { email: string; productIds: string[]; otherText: string; again: Again | '' } & Record<RatingKey, number>
+type Field = 'email' | 'product' | RatingKey | 'again'
+type Errors = Partial<Record<Field, string>>
 
-const EMPTY: Answers = { productId: '', otherText: '', taste: 0, texture: 0, overall: 0, again: '', email: '' }
+const EMPTY: Answers = { email: '', productIds: [], otherText: '', taste: 0, texture: 0, overall: 0, again: '' }
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const EMAIL_DOMAINS = ['gmail.com', 'hotmail.co.uk', 'outlook.com', 'icloud.com']
 const RESET_SECONDS = 8
 
+const productById = (id: string) => PRODUCTS.find((p) => p.id === id)!
+
 export default function Survey() {
   const [answers, setAnswers] = useState<Answers>(EMPTY)
-  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({})
+  const [errors, setErrors] = useState<Errors>({})
   const [saveError, setSaveError] = useState('')
   const [done, setDone] = useState(false)
   const cards = useRef<Partial<Record<Field, HTMLElement | null>>>({})
   const emailInput = useRef<HTMLInputElement>(null)
 
-  const set = <K extends keyof Answers>(k: K, v: Answers[K], field: Field) => {
-    setAnswers((a) => ({ ...a, [k]: v }))
-    setErrors((e) => ({ ...e, [field]: undefined }))
+  const clearError = (key: Field) => setErrors((e) => ({ ...e, [key]: undefined }))
+
+  const setEmail = (email: string) => { setAnswers((a) => ({ ...a, email })); clearError('email') }
+  const setOtherText = (otherText: string) => { setAnswers((a) => ({ ...a, otherText })); clearError('product') }
+
+  const toggleProduct = (id: string) => {
+    setAnswers((a) => ({
+      ...a,
+      productIds: a.productIds.includes(id) ? a.productIds.filter((p) => p !== id) : [...a.productIds, id],
+    }))
+    clearError('product')
+  }
+
+  const rate = <K extends RatingKey | 'again'>(key: K, value: Answers[K]) => {
+    setAnswers((a) => ({ ...a, [key]: value }))
+    clearError(key)
   }
 
   // Show domains once typing starts; after "@", narrow to the ones that match
@@ -32,7 +48,7 @@ export default function Survey() {
   // Replace whatever follows "@" with the tapped domain, keeping the name part.
   const pickDomain = (domain: string) => {
     const name = answers.email.split('@')[0].trim()
-    set('email', `${name}@${domain}`, 'email')
+    setEmail(`${name}@${domain}`)
     const input = emailInput.current
     if (!input) return
     input.focus()
@@ -42,11 +58,11 @@ export default function Survey() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    const next: Partial<Record<Field, string>> = {}
+    const next: Errors = {}
     if (!answers.email.trim()) next.email = 'Enter your email.'
     else if (!EMAIL_RE.test(answers.email.trim())) next.email = 'Check your email. It should look like name@example.com.'
-    if (!answers.productId) next.product = 'Choose the product you tried.'
-    else if (answers.productId === 'other' && !answers.otherText.trim()) next.product = 'Write the name of the product you tried.'
+    if (!answers.productIds.length) next.product = 'Choose at least one product you tried.'
+    else if (answers.productIds.includes('other') && !answers.otherText.trim()) next.product = 'Write the name of the other product you tried.'
     RATINGS.forEach((r) => { if (!answers[r.key]) next[r.key] = 'Choose a score from 1 to 5.' })
     if (!answers.again) next.again = 'Choose one answer.'
     setErrors(next)
@@ -54,11 +70,13 @@ export default function Survey() {
     const first = (Object.keys(next) as Field[])[0]
     if (first) { cards.current[first]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return }
 
-    const product = PRODUCTS.find((p) => p.id === answers.productId)!
     try {
       saveResponse({
-        productId: product.id,
-        productName: product.other ? answers.otherText.trim() : product.name,
+        productIds: answers.productIds,
+        productNames: answers.productIds.map((id) => {
+          const product = productById(id)
+          return product.other ? answers.otherText.trim() : product.name
+        }),
         taste: answers.taste, texture: answers.texture, overall: answers.overall,
         again: answers.again as Again,
         email: answers.email.trim().toLowerCase(),
@@ -92,7 +110,7 @@ export default function Survey() {
                 </label>
                 <input id="email" ref={emailInput} name="email" type="text" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
                   maxLength={120} placeholder="name@example.com"
-                  value={answers.email} onChange={(e) => set('email', e.target.value, 'email')}
+                  value={answers.email} onChange={(e) => setEmail(e.target.value)}
                   className="mt-2 w-full rounded-xl border-2 border-line bg-white px-3.5 py-3 text-base outline-none focus:border-beth-green" />
                 <AnimatePresence initial={false}>
                   {domainSuggestions.length > 0 && (
@@ -126,18 +144,19 @@ export default function Survey() {
 
             <Card error={errors.product} ref={(el) => { cards.current.product = el }}>
               <fieldset className="m-0 min-w-0 border-0 p-0">
-                <Legend>Which product did you try?</Legend>
+                <Legend>Which products did you try?</Legend>
+                <p className="m-0 mt-1 text-ink-muted">Choose all that apply.</p>
                 <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
                   {PRODUCTS.map((p) => (
-                    <ProductOption key={p.id} product={p} checked={answers.productId === p.id}
-                      onChange={() => set('productId', p.id, 'product')} />
+                    <ProductOption key={p.id} product={p} checked={answers.productIds.includes(p.id)}
+                      onChange={() => toggleProduct(p.id)} />
                   ))}
                 </div>
-                {answers.productId === 'other' && (
+                {answers.productIds.includes('other') && (
                   <div className="mt-3">
-                    <label htmlFor="other-text" className="text-sm text-ink-muted">Tell us which product</label>
+                    <label htmlFor="other-text" className="text-sm text-ink-muted">Tell us which other product</label>
                     <input id="other-text" autoFocus type="text" maxLength={80} autoComplete="off" placeholder="Product name"
-                      value={answers.otherText} onChange={(e) => set('otherText', e.target.value, 'product')}
+                      value={answers.otherText} onChange={(e) => setOtherText(e.target.value)}
                       className="mt-1 w-full rounded-xl border-2 border-line bg-white px-3.5 py-3 text-base outline-none focus:border-beth-green" />
                   </div>
                 )}
@@ -154,7 +173,7 @@ export default function Survey() {
                       return (
                         <label key={f.value} className={`grid cursor-pointer justify-items-center gap-0.5 rounded-xl border-2 px-1 pt-3 pb-2.5 transition has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink sm:rounded-2xl ${checked ? '-translate-y-0.5 border-ink bg-beth-yellow' : 'border-line bg-white hover:border-beth-yellow-deep'}`}>
                           <input type="radio" name={r.key} value={f.value} checked={checked}
-                            onChange={() => set(r.key, f.value, r.key)} className="sr-only" />
+                            onChange={() => rate(r.key, f.value)} className="sr-only" />
                           <span aria-hidden="true" className="text-[clamp(1.7rem,7vw,2.4rem)] leading-tight">{f.emoji}</span>
                           <span className="font-bold tabular-nums">{f.value}</span>
                         </label>
@@ -170,14 +189,14 @@ export default function Survey() {
 
             <Card error={errors.again} ref={(el) => { cards.current.again = el }}>
               <fieldset className="m-0 min-w-0 border-0 p-0">
-                <Legend n={4}>Would you choose to eat this product again?</Legend>
+                <Legend n={4}>Would you choose to eat {answers.productIds.length > 1 ? 'these products' : 'this product'} again?</Legend>
                 <div className="mt-4 grid gap-2">
                   {AGAIN.map((a) => {
                     const checked = answers.again === a
                     return (
                       <label key={a} className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 px-4 py-3.5 font-medium has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${checked ? 'border-beth-green bg-beth-green-soft' : 'border-line bg-white hover:border-beth-yellow-deep'}`}>
                         <input type="radio" name="again" value={a} checked={checked}
-                          onChange={() => set('again', a, 'again')} className="sr-only" />
+                          onChange={() => rate('again', a)} className="sr-only" />
                         <Tick checked={checked} />{a}
                       </label>
                     )
@@ -229,18 +248,28 @@ function Tick({ checked }: { checked: boolean }) {
   )
 }
 
+function Checkbox({ checked }: { checked: boolean }) {
+  return (
+    <span aria-hidden="true" className={`mt-px grid size-5 flex-none place-items-center rounded-md border-2 ${checked ? 'border-beth-green bg-beth-green' : 'border-line bg-white'}`}>
+      {checked && (
+        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+      )}
+    </span>
+  )
+}
+
 function ProductOption({ product, checked, onChange }: { product: Product; checked: boolean; onChange: () => void }) {
   const [photoOk, setPhotoOk] = useState(!!product.photo)
   return (
     <label className={`grid h-full cursor-pointer grid-rows-[auto_1fr] overflow-hidden rounded-2xl border-2 bg-white transition has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink ${checked ? 'border-beth-green ring-3 ring-beth-green-soft' : 'border-line hover:border-beth-yellow-deep'}`}>
-      <input type="radio" name="product" value={product.id} checked={checked} onChange={onChange} className="sr-only" />
+      <input type="checkbox" name="products" value={product.id} checked={checked} onChange={onChange} className="sr-only" />
       <span className="photo-placeholder relative grid aspect-[4/3] place-items-center overflow-hidden text-xs tracking-widest text-ink-muted uppercase">
         {photoOk
           ? <img src={product.photo} alt={product.name} onError={() => setPhotoOk(false)} className={product.other ? 'absolute inset-0 size-full bg-beth-yellow object-contain p-[18%]' : 'absolute inset-0 size-full object-cover'} />
           : <span className="grid justify-items-center gap-1"><CameraIcon />Photo</span>}
       </span>
       <span className="flex items-start gap-2 px-3 pt-2.5 pb-3 leading-tight font-medium">
-        <Tick checked={checked} />
+        <Checkbox checked={checked} />
         <span>{product.name}{product.sub && <span className="block text-sm font-normal text-ink-muted">{product.sub}</span>}</span>
       </span>
     </label>

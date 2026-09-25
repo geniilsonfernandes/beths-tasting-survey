@@ -17,7 +17,8 @@ export default function Results() {
   const groups = useMemo(() => {
     const byName = new Map<string, Response[]>()
     PRODUCTS.filter((p) => !p.other).forEach((p) => byName.set(p.name, []))
-    rows.forEach((r) => byName.set(r.productName, [...(byName.get(r.productName) ?? []), r]))
+    // A response that covers several products counts toward each of them
+    rows.forEach((r) => r.productNames.forEach((name) => byName.set(name, [...(byName.get(name) ?? []), r])))
     return [...byName.entries()]
   }, [rows])
 
@@ -93,7 +94,7 @@ export default function Results() {
               {[...rows].reverse().slice(0, 20).map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-white px-4 py-3 text-sm">
                   <span className="min-w-[10rem] flex-1 font-medium">
-                    {r.productName}
+                    {r.productNames.join(', ')}
                     {r.email && <span className="block font-normal text-ink-muted">{r.email}</span>}
                   </span>
                   <span className="tabular-nums">Taste {r.taste} · Texture {r.texture} · Overall {r.overall}</span>
