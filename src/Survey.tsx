@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { AGAIN, FACES, PRODUCTS, RATINGS, RESULTS_ROUTE, type Again, type Product, type RatingKey } from './data'
 import { saveResponse } from './storage'
 import Header, { HeaderLink } from './Header'
@@ -8,6 +9,7 @@ type Field = 'product' | RatingKey | 'again' | 'email'
 
 const EMPTY: Answers = { productId: '', otherText: '', taste: 0, texture: 0, overall: 0, again: '', email: '' }
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_DOMAINS = ['gmail.com', 'hotmail.co.uk', 'outlook.com', 'icloud.com']
 const RESET_SECONDS = 8
 
 export default function Survey() {
@@ -16,21 +18,37 @@ export default function Survey() {
   const [saveError, setSaveError] = useState('')
   const [done, setDone] = useState(false)
   const cards = useRef<Partial<Record<Field, HTMLElement | null>>>({})
+  const emailInput = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof Answers>(k: K, v: Answers[K], field: Field) => {
     setAnswers((a) => ({ ...a, [k]: v }))
     setErrors((e) => ({ ...e, [field]: undefined }))
   }
 
+  // Show domains once typing starts; after "@", narrow to the ones that match
+  const typedDomain = answers.email.includes('@') ? answers.email.split('@')[1].trim().toLowerCase() : ''
+  const domainSuggestions = answers.email.trim() ? EMAIL_DOMAINS.filter((d) => d.startsWith(typedDomain)) : []
+
+  // Replace whatever follows "@" with the tapped domain, keeping the name part.
+  const pickDomain = (domain: string) => {
+    const name = answers.email.split('@')[0].trim()
+    set('email', `${name}@${domain}`, 'email')
+    const input = emailInput.current
+    if (!input) return
+    input.focus()
+    // No name yet: put the cursor before "@" so the person types it next
+    requestAnimationFrame(() => input.setSelectionRange(name.length, name.length))
+  }
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const next: Partial<Record<Field, string>> = {}
+    if (!answers.email.trim()) next.email = 'Enter your email.'
+    else if (!EMAIL_RE.test(answers.email.trim())) next.email = 'Check your email. It should look like name@example.com.'
     if (!answers.productId) next.product = 'Choose the product you tried.'
     else if (answers.productId === 'other' && !answers.otherText.trim()) next.product = 'Write the name of the product you tried.'
     RATINGS.forEach((r) => { if (!answers[r.key]) next[r.key] = 'Choose a score from 1 to 5.' })
     if (!answers.again) next.again = 'Choose one answer.'
-    if (!answers.email.trim()) next.email = 'Enter your email.'
-    else if (!EMAIL_RE.test(answers.email.trim())) next.email = 'Check your email. It should look like name@example.com.'
     setErrors(next)
 
     const first = (Object.keys(next) as Field[])[0]
@@ -67,6 +85,45 @@ export default function Survey() {
       <main className="mx-auto max-w-3xl px-4">
         {done ? <Thanks onRestart={reset} /> : (
           <form onSubmit={submit} noValidate className="-mt-10 grid gap-5">
+            <Card error={errors.email} ref={(el) => { cards.current.email = el }}>
+              <div className="grid gap-2">
+                <label htmlFor="email" className="p-0 font-display text-[1.3rem] leading-snug font-semibold text-balance">
+                  What’s your email?
+                </label>
+                <input id="email" ref={emailInput} name="email" type="text" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+                  maxLength={120} placeholder="name@example.com"
+                  value={answers.email} onChange={(e) => set('email', e.target.value, 'email')}
+                  className="mt-2 w-full rounded-xl border-2 border-line bg-white px-3.5 py-3 text-base outline-none focus:border-beth-green" />
+                <AnimatePresence initial={false}>
+                  {domainSuggestions.length > 0 && (
+                    <motion.div key="domains" aria-label="Email domains"
+                      initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                      className="overflow-hidden">
+                      <motion.div layout className="flex flex-wrap gap-2 pt-1 pb-0.5">
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          {domainSuggestions.map((d, i) => {
+                            const active = answers.email.trim().toLowerCase().endsWith('@' + d)
+                            return (
+                              <motion.button key={d} type="button" layout
+                                initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 500, damping: 30, delay: i * 0.04 } }}
+                                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+                                whileTap={{ scale: 0.94 }}
+                                onPointerDown={(e) => e.preventDefault()} onClick={() => pickDomain(d)}
+                                className={`cursor-pointer rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink ${active ? 'border-beth-green bg-beth-green-soft text-beth-green' : 'border-line bg-white hover:border-beth-yellow-deep'}`}>
+                                @{d}
+                              </motion.button>
+                            )
+                          })}
+                        </AnimatePresence>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </Card>
+
             <Card error={errors.product} ref={(el) => { cards.current.product = el }}>
               <fieldset className="m-0 min-w-0 border-0 p-0">
                 <Legend>Which product did you try?</Legend>
@@ -127,19 +184,6 @@ export default function Survey() {
                   })}
                 </div>
               </fieldset>
-            </Card>
-
-            <Card error={errors.email} ref={(el) => { cards.current.email = el }}>
-              <div className="grid gap-2">
-                <label htmlFor="email" className="p-0 font-display text-[1.3rem] leading-snug font-semibold text-balance">
-                  <span className="mr-2.5 inline-grid size-[1.8em] place-items-center rounded-full bg-beth-yellow align-[0.1em] text-[0.8em] font-extrabold">5</span>
-                  What’s your email?
-                </label>
-                <input id="email" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
-                  maxLength={120} placeholder="name@example.com"
-                  value={answers.email} onChange={(e) => set('email', e.target.value, 'email')}
-                  className="mt-2 w-full rounded-xl border-2 border-line bg-white px-3.5 py-3 text-base outline-none focus:border-beth-green" />
-              </div>
             </Card>
 
             <div className="grid gap-2.5">
