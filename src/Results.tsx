@@ -92,7 +92,10 @@ export default function Results() {
             <ul className="m-0 grid list-none gap-2 p-0">
               {[...rows].reverse().slice(0, 20).map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-line bg-white px-4 py-3 text-sm">
-                  <span className="min-w-[10rem] flex-1 font-medium">{r.productName}</span>
+                  <span className="min-w-[10rem] flex-1 font-medium">
+                    {r.productName}
+                    {r.email && <span className="block font-normal text-ink-muted">{r.email}</span>}
+                  </span>
                   <span className="tabular-nums">Taste {r.taste} · Texture {r.texture} · Overall {r.overall}</span>
                   <span className="text-ink-muted">{r.again}</span>
                   <span className="text-ink-muted tabular-nums">{new Date(r.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>

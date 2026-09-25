@@ -3,10 +3,11 @@ import { AGAIN, FACES, PRODUCTS, RATINGS, RESULTS_ROUTE, type Again, type Produc
 import { saveResponse } from './storage'
 import Header, { HeaderLink } from './Header'
 
-type Answers = { productId: string; otherText: string; again: Again | '' } & Record<RatingKey, number>
-type Field = 'product' | RatingKey | 'again'
+type Answers = { productId: string; otherText: string; again: Again | ''; email: string } & Record<RatingKey, number>
+type Field = 'product' | RatingKey | 'again' | 'email'
 
-const EMPTY: Answers = { productId: '', otherText: '', taste: 0, texture: 0, overall: 0, again: '' }
+const EMPTY: Answers = { productId: '', otherText: '', taste: 0, texture: 0, overall: 0, again: '', email: '' }
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const RESET_SECONDS = 8
 
 export default function Survey() {
@@ -28,6 +29,8 @@ export default function Survey() {
     else if (answers.productId === 'other' && !answers.otherText.trim()) next.product = 'Write the name of the product you tried.'
     RATINGS.forEach((r) => { if (!answers[r.key]) next[r.key] = 'Choose a score from 1 to 5.' })
     if (!answers.again) next.again = 'Choose one answer.'
+    if (!answers.email.trim()) next.email = 'Enter your email.'
+    else if (!EMAIL_RE.test(answers.email.trim())) next.email = 'Check your email. It should look like name@example.com.'
     setErrors(next)
 
     const first = (Object.keys(next) as Field[])[0]
@@ -40,6 +43,7 @@ export default function Survey() {
         productName: product.other ? answers.otherText.trim() : product.name,
         taste: answers.taste, texture: answers.texture, overall: answers.overall,
         again: answers.again as Again,
+        email: answers.email.trim().toLowerCase(),
       })
       setSaveError('')
       setDone(true)
@@ -125,11 +129,28 @@ export default function Survey() {
               </fieldset>
             </Card>
 
+            <Card error={errors.email} ref={(el) => { cards.current.email = el }}>
+              <div className="grid gap-2">
+                <label htmlFor="email" className="p-0 font-display text-[1.3rem] leading-snug font-semibold text-balance">
+                  <span className="mr-2.5 inline-grid size-[1.8em] place-items-center rounded-full bg-beth-yellow align-[0.1em] text-[0.8em] font-extrabold">5</span>
+                  What’s your email?
+                </label>
+                <input id="email" name="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+                  maxLength={120} placeholder="name@example.com"
+                  value={answers.email} onChange={(e) => set('email', e.target.value, 'email')}
+                  className="mt-2 w-full rounded-xl border-2 border-line bg-white px-3.5 py-3 text-base outline-none focus:border-beth-green" />
+              </div>
+            </Card>
+
             <div className="grid gap-2.5">
               {saveError && <p className="m-0 rounded-xl bg-beth-red-soft px-4 py-3 font-medium text-beth-red">{saveError}</p>}
               <button type="submit" className="cursor-pointer rounded-full bg-beth-yellow px-7 py-4.5 font-display text-lg font-extrabold tracking-wide uppercase shadow-[0_3px_0_var(--color-beth-yellow-deep)] transition hover:-translate-y-px active:translate-y-0.5 active:shadow-[0_1px_0_var(--color-beth-yellow-deep)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ink">
                 Send my answers
               </button>
+              <p className="m-0 mx-auto max-w-[52ch] text-center text-sm leading-relaxed text-ink-muted">
+                We’ll use your email only to follow up about this tasting. We won’t share it or add you to marketing emails.
+                To have your data deleted, email <span className="font-semibold text-ink select-all">hello@beths.uk</span>.
+              </p>
             </div>
           </form>
         )}

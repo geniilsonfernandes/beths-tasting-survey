@@ -8,9 +8,9 @@ export const PRODUCTS: Product[] = [
   { id: 'sausage-roll', name: 'Sausage Roll', photo: '/products/sausage-roll.webp' },
   { id: 'churros', name: 'Churros', photo: '/products/churros.webp' },
   { id: 'cheese-bread', name: 'Cheese Bread', photo: '/products/cheese-bread.webp' },
-  { id: 'cheese-bread-chocolate', name: 'Cheese Bread with Chocolate', photo: '/products/unknow.webp' },
+  { id: 'cheese-bread-chocolate', name: 'Cheese Bread with Chocolate', photo: '/products/cheese-bread-chocolate.webp' },
   { id: 'kibe', name: 'Kibe', sub: 'Beef & Bulgur Croquette', photo: '/products/kibe.webp' },
-  { id: 'vegan-kibe', name: 'Vegan Kibe', sub: 'Vegan Beef & Bulgur Croquette', photo: '/products/unknow.webp' },
+  { id: 'vegan-kibe', name: 'Vegan Kibe', sub: 'Vegan Beef & Bulgur Croquette', photo: '/products/vegan-kibe.webp' },
   { id: 'other', name: 'Other', sub: 'Something else', photo: '/logo-beths.svg', other: true },
 ]
 

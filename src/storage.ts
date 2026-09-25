@@ -6,6 +6,7 @@ export type Response = {
   productId: string
   productName: string
   again: Again
+  email: string
 } & Record<RatingKey, number>
 
 // Responses are kept on this device (same approach as spin-to-win).
@@ -28,7 +29,7 @@ export function clearResponses() {
 
 export function toCsv(rows: Response[]): string {
   const q = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const header = ['submitted_at', 'product', 'taste', 'texture', 'overall', 'would_eat_again']
+  const header = ['submitted_at', 'email', 'product', 'taste', 'texture', 'overall', 'would_eat_again']
   return [header.join(','), ...rows.map((r) =>
-    [r.submittedAt, r.productName, r.taste, r.texture, r.overall, r.again].map(q).join(','))].join('\n')
+    [r.submittedAt, r.email, r.productName, r.taste, r.texture, r.overall, r.again].map(q).join(','))].join('\n')
 }
