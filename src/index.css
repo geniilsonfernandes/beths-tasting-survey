@@ -16,6 +16,8 @@
   --font-sans: "Cairo", "Segoe UI", system-ui, sans-serif;
 }
 
+:root { color-scheme: light only; }
+
 html, body, #root { min-height: 100%; margin: 0; }
 body { background: var(--color-ground); color: var(--color-ink); font-family: var(--font-sans); -webkit-tap-highlight-color: transparent; }
 
